@@ -9,6 +9,8 @@ def create_jp2s(tiff_filepaths, jp2_dir):
                 "-b", "64,64",
                 "-p", "RPCL",
                 "-n", "7",
+                "-t", "512,512",
+                "-I",
                 "-SOP"]
     for tiff_filepath in tiff_filepaths:
         identifier, _ = os.path.splitext(os.path.basename(tiff_filepath))
