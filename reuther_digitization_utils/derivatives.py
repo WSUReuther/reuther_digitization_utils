@@ -1,8 +1,32 @@
 import os
 import subprocess
 
+from PIL import Image
 
-def create_jp2s(tiff_filepaths, jp2_dir):
+
+def create_derivative_images(tiff_filepaths, derivative_images_dir, derivative_type="jp2"):
+    alpha_channels = check_alpha_channels(tiff_filepaths)
+    if alpha_channels:
+        raise Exception(f"Alpha channel detected. Remove alpha channels before proceeding. {'; '.join(alpha_channels)}")
+    for tiff_filepath in tiff_filepaths:
+        identifier, _ = os.path.splitext(os.path.basename(tiff_filepath))
+        derivative_filepath = os.path.join(derivative_images_dir, f"{identifier}.{derivative_type}")
+        if derivative_type == "jp2":
+            create_jp2(tiff_filepath, derivative_filepath)
+        elif derivative_type == "jpg":
+            create_jpeg(tiff_filepath, derivative_filepath)
+
+
+def check_alpha_channels(tiff_filepaths):
+    alpha_channel_tiffs = []
+    for tiff_filepath in tiff_filepaths:
+        with Image.open(tiff_filepath) as img:
+            if img.mode in ["RGBA", "LA"]:
+                alpha_channel_tiffs.append(tiff_filepath)
+    return alpha_channel_tiffs
+
+
+def create_jp2(tiff_filepath, jp2_filepath):
     openjpeg_opts = [
                 "-r", "2.4",
                 "-c", "[256,256],[256,256],[128,128]",
@@ -12,15 +36,21 @@ def create_jp2s(tiff_filepaths, jp2_dir):
                 "-t", "512,512",
                 "-I",
                 "-SOP"]
-    for tiff_filepath in tiff_filepaths:
-        identifier, _ = os.path.splitext(os.path.basename(tiff_filepath))
-        jp2_filepath = os.path.join(jp2_dir, f"{identifier}.jp2")
-        if not os.path.exists(jp2_filepath):
-            cmd = [
-                "/usr/local/bin/opj_compress",
-                "-i", tiff_filepath,
-                "-o", jp2_filepath] + openjpeg_opts
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    if not os.path.exists(jp2_filepath):
+        cmd = [
+            "/usr/local/bin/opj_compress",
+            "-i", tiff_filepath,
+            "-o", jp2_filepath] + openjpeg_opts
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+
+
+def create_jpeg(tiff_filepath, jpeg_filepath):
+    if not os.path.exists(jpeg_filepath):
+        with Image.open(tiff_filepath) as input_img:
+            icc_profile = input_img.info.get("icc_profile")
+            if input_img.mode == "RGBA":
+                input_img = input_img.convert(mode="RGB")
+            input_img.save(jpeg_filepath, "JPEG", quality=92, icc_profile=icc_profile)
 
 
 def create_pdf(image_filepaths, pdf_filepath):

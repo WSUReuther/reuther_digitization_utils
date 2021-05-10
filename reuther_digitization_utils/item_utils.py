@@ -1,6 +1,6 @@
 import os
 
-from reuther_digitization_utils.derivatives import create_jp2s, create_pdf, compress_pdf, ocr_pdf
+from reuther_digitization_utils.derivatives import create_derivative_images, create_pdf, compress_pdf, ocr_pdf
 from reuther_digitization_utils.dir_structure import rename_files_in_directory
 from reuther_digitization_utils.file_copying import check_create_remote_dir, copy_item_directory
 
@@ -15,15 +15,14 @@ class ItemUtils:
         self.item_identifier = item_identifier
         self.remote_scans_dir = remote_scans_dir
 
-    def generate_derivatives(self, derivatives_type="jp2"):
-        if derivatives_type == "jp2":
-            self.derivatives_type = derivatives_type
-            self.derivatives_dir = os.path.join(self.access_dir, derivatives_type)
-            generate_derivative_images_func = self._generate_jp2s
+    def generate_derivatives(self, derivative_type="jp2"):
+        if derivative_type in ["jp2", "jpg"]:
+            self.derivative_type = derivative_type
+            self.derivatives_dir = os.path.join(self.access_dir, derivative_type)
         else:
-            raise Exception(f"unsupported derivative type: {derivatives_type}")
+            raise Exception(f"unsupported derivative type: {derivative_type}")
         self._check_create_derivative_dirs()
-        derivative_images_resp = generate_derivative_images_func()
+        derivative_images_resp = self._generate_derivative_images()
         pdf_resp = self._generate_pdf()
         return f"{derivative_images_resp}, {pdf_resp}"
 
@@ -51,10 +50,7 @@ class ItemUtils:
             os.makedirs(self.derivatives_dir)
 
     def get_derivative_filepaths(self):
-        return [os.path.join(self.derivatives_dir, filename) for filename in os.listdir(self.derivatives_dir) if filename.endswith(self.derivatives_type)]
-
-    def get_jp2_filepaths(self):
-        return [os.path.join(self.derivatives_dir, filename) for filename in os.listdir(self.derivatives_dir) if filename.endswith(".jp2")]
+        return [os.path.join(self.derivatives_dir, filename) for filename in os.listdir(self.derivatives_dir) if filename.endswith(self.derivative_type)]
 
     def get_tiff_filepaths(self):
         return [os.path.join(self.tiffs_dir, filename) for filename in os.listdir(self.tiffs_dir) if filename.endswith(".tif")]
@@ -63,18 +59,14 @@ class ItemUtils:
         return os.path.join(self.access_dir, f"{self.item_identifier}_001.pdf")
 
     def _generate_derivative_images(self):
-        self.derivatives_func()
-
-    def _generate_jp2s(self):
         tiff_filepaths = self.get_tiff_filepaths()
         if tiff_filepaths:
-            jp2_dir = self.derivatives_dir
-            jp2_filepaths = self.get_jp2_filepaths()
-            if len(tiff_filepaths) == len(jp2_filepaths):
-                return "an equal number of jp2s to tiffs already exist"
+            derivative_filepaths = self.get_derivative_filepaths()
+            if len(tiff_filepaths) == len(derivative_filepaths):
+                return f"an equal number of {self.derivative_type}s to tiffs already exist"
             else:
-                create_jp2s(tiff_filepaths, jp2_dir)
-                return "created jp2s"
+                create_derivative_images(tiff_filepaths, self.derivatives_dir, derivative_type=self.derivative_type)
+                return "created derivative images"
         else:
             raise Exception(f"Error creating derivative images. No TIFF files found for {self.item_identifier}")
 
